@@ -8,15 +8,15 @@ import re
 
 # Page Configuration
 st.set_page_config(
-    page_title="100% Accurate Hoof Dressing Tracker",
-    page_icon="🐴",
+    page_title="Kevin Bacon Tracker",
+    page_icon="",
     layout="wide"
 )
 
-st.title("🐴 Kevin Bacon's Liquid Hoof Dressing Tracker")
+st.title("Kevin Bacon Tracker")
 st.markdown(
     """
-    Compare **100% accurate, real-time live prices** for both **500ml** and **1L** tins side-by-side. 
+    Compare real-time prices. 
     All requests are securely routed through **Scrape.do** proxies with container-specific selectors to prevent sidebar price leakage.
     """
 )
@@ -32,7 +32,6 @@ except KeyError:
 STORE_DATABASE = {
     "Waterman's Supplies": {
         "url": "https://www.watermanscountrysupplies.co.uk/hoof-care/kevin-bacons-liquid-hoof-dressing/",
-        # Restrict to the main product form only to bypass "People also viewed"
         "price_selector": ".product-actions-wrapper .price, .product-info-main .price",
         "fallback_500ml": 12.79, "fallback_1l": None
     },
@@ -118,15 +117,22 @@ def fetch_via_scrapedo(store_name, info, token):
         encoded_target = urllib.parse.quote(info["url"], safe="")
         api_url = f"https://api.scrape.do/?token={token}&url={encoded_target}&render=true"
 
-        res = requests.get(api_url, timeout=25)
+        # Timeout extended to 35s to allow for sequential requests in thread execution queue
+        res = requests.get(api_url, timeout=35)
         if res.status_code == 200:
             soup = BeautifulSoup(res.content, "html.parser")
             body_text = soup.get_text().lower()
 
             if store_name == "Mole Avon":
+                # Find only values explicitly tied to 'inc VAT' string markers in Mole Avon's text structure
                 match = re.search(r'£?(\d+\.\d{2})\s*inc\s*VAT', body_text, re.IGNORECASE)
                 if match:
                     p_500 = float(match.group(1))
+                else:
+                    # Fallback to selector extraction if regex text matching misses
+                    price_node = soup.select_one(info["price_selector"])
+                    if price_node:
+                        p_500 = clean_extracted_price(price_node.get_text())
             else:
                 found_prices = []
                 # Isolate target selector nodes inside core elements only
@@ -175,7 +181,7 @@ def fetch_via_scrapedo(store_name, info, token):
 
 # Execution Action button
 if st.button("🔄 Scrape Live Prices Now", type="primary"):
-    with st.spinner("Routing browser requests securely..."):
+    with st.spinner("Routing browser requests securely through Scrape.do proxy gateway..."):
         results = []
         # max_workers=2 guarantees we stay strictly within the free tier's concurrency limits
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
