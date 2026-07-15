@@ -32,7 +32,7 @@ except KeyError:
 STORE_DATABASE = {
     "Waterman's Supplies": {
         "url": "https://www.watermanscountrysupplies.co.uk/hoof-care/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": ".product-actions-wrapper .price, .product-info-main .price",
+        "price_selector": ".product-actions-wrapper .price, .product-info-main .price, .price",
         "fallback_500ml": 12.79, "fallback_1l": None,
         "is_shopify": False
     },
@@ -48,25 +48,25 @@ STORE_DATABASE = {
     },
     "Tanner Trading": {
         "url": "https://www.tannertrading.co.uk/hoof-protection/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": ".productView-price .price--withoutTax, .productView-options .price--withoutTax",
+        "price_selector": ".productView-price .price--withoutTax, .productView-options .price--withoutTax, .price",
         "fallback_500ml": 15.98, "fallback_1l": 24.34,
         "is_shopify": False
     },
     "Hyperdrug (Equine)": {
         "url": "https://hyperdrug.co.uk/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": ".product-info-main .price, .product-view .price",
+        "price_selector": ".product-info-main .price, .product-view .price, .price",
         "fallback_500ml": 18.60, "fallback_1l": 29.00,
         "is_shopify": False
     },
     "Redpost Equestrian": {
         "url": "https://www.redpostequestrian.co.uk/horse-care/hoof-care/kevin-bacon-liquid-hoof-dressing__149552",
-        "price_selector": ".product-info-price .price, .price-box .price",
+        "price_selector": ".product-info-price .price, .price-box .price, .price",
         "fallback_500ml": 18.60, "fallback_1l": 29.00,
         "is_shopify": False
     },
     "VioVet (Liquid Edition)": {
         "url": "https://www.viovet.co.uk/Kevin-Bacons-Liquid-Hoof-Dressing/c171350/",
-        "price_selector": "table.products-table tr.product-row .price, .product-item-details .price",
+        "price_selector": "table.products-table tr.product-row .price, .product-item-details .price, .price",
         "fallback_500ml": 18.60, "fallback_1l": 29.00,
         "is_shopify": False
     },
@@ -77,13 +77,13 @@ STORE_DATABASE = {
     },
     "Discount Equestrian": {
         "url": "https://www.discount-equestrian.co.uk/kevin-bacon-s-liquid-hoof-dressing.html",
-        "price_selector": ".product-info-main .price-box .price",
+        "price_selector": ".product-info-main .price-box .price, .price",
         "fallback_500ml": 19.49, "fallback_1l": 29.70,
         "is_shopify": False
     },
     "Hoof Bootique": {
         "url": "https://hoofbootique.co.uk/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": ".productView-details .price--withoutTax, .productView-details .price",
+        "price_selector": ".productView-details .price--withoutTax, .productView-details .price, .price",
         "fallback_500ml": 19.50, "fallback_1l": 29.95,
         "is_shopify": False
     },
@@ -108,7 +108,8 @@ STORE_DATABASE = {
 def clean_extracted_price(text_string):
     if not text_string:
         return None
-    clean_str = text_string.replace('\n', '').replace('\r', '').replace(' ', '').strip()
+    # Remove spacing, newlines, commas, and currency markings
+    clean_str = text_string.replace('\n', '').replace('\r', '').replace(' ', '').replace(',', '').strip()
     match = re.search(r'£?\s*(\d+(?:\.\d{2})?)', clean_str)
     if match:
         val = float(match.group(1))
@@ -123,7 +124,7 @@ def fetch_via_scrapedo(store_name, info, token):
     scrape_success = False
 
     try:
-        # A. Direct JSON Parser for Shopify Stores (AG, GS, Millbry, First Choice, Equi)
+        # A. Direct JSON Parser for Shopify Stores
         if info["is_shopify"]:
             target_url = f"{info['url']}.js"
             encoded_target = urllib.parse.quote(target_url, safe="")
@@ -157,7 +158,6 @@ def fetch_via_scrapedo(store_name, info, token):
 
                 if store_name == "Mole Avon":
                     # Locate the product details container (which contains "Item:")
-                    # This prevents pulling global sidebar ads like "Fly Rug £30.99"
                     product_container = None
                     for element in soup.find_all(["div", "section", "article"]):
                         el_text = element.get_text()
@@ -226,7 +226,6 @@ def fetch_via_scrapedo(store_name, info, token):
 if st.button("🔄 Scrape Live Prices Now", type="primary"):
     with st.spinner("Routing browser requests securely through Scrape.do proxy gateway..."):
         results = []
-        # Concurrency set to 2 to remain safe under free tier restrictions
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(fetch_via_scrapedo, name, cfg, SCRAPE_TOKEN) for name, cfg in STORE_DATABASE.items()]
             for f in concurrent.futures.as_completed(futures):
