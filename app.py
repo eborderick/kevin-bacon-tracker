@@ -47,12 +47,16 @@ STORES_CLOUD_FRIENDLY = {
     },
     "Mole Avon": {
         "url": "https://www.moleavon.co.uk/kevin-bacons-liquid-hoof-dressing-500ml/p21647",
-        # Specific target to fetch the 'inc VAT' text block directly to avoid grabbing ex-VAT or raw IDs
         "selectors": [".product-form__price"]
     },
     "Discount Equestrian": {
         "url": "https://www.discount-equestrian.co.uk/kevin-bacon-s-liquid-hoof-dressing.html",
-        "selectors": [".price", "span.price", ".regular-price"]
+        # Avoid generic page wrappers. Target the exact product-price container wrapper.
+        "selectors": [
+            "span[id^='product-price-'] span.price",
+            "span.price-wrapper span.price",
+            ".price-box span.price"
+        ]
     }
 }
 
@@ -120,20 +124,24 @@ def fetch_price(store_name, store_info):
                 if price_element:
                     price_text = price_element.get_text(strip=True)
                     
-                    # If dealing with Mole Avon, prioritize finding the true inc VAT tag specifically
+                    # Target Mole Avon specifically
                     if store_name == "Mole Avon":
                         inc_vat_match = re.search(r'£?(\d+\.\d{2})\s*inc\s*VAT', price_text, re.IGNORECASE)
                         if inc_vat_match:
                             return {"Retailer": store_name, "Price": float(inc_vat_match.group(1)), "Link": store_info["url"]}
                     
-                    # Default regex extraction fallback
-                    match = re.search(r'\d+(?:\.\d{2})?', price_text)
+                    # Clean out non-price tags like percentages or rating points (e.g. 100% or "100 reviews")
+                    # Match standard currency formats like £19.49 or 19.49
+                    match = re.search(r'£?\s*(\d+(?:\.\d{2})?)', price_text)
                     if match:
-                        return {
-                            "Retailer": store_name,
-                            "Price": float(match.group(0)),
-                            "Link": store_info["url"]
-                        }
+                        extracted_val = float(match.group(1))
+                        # Basic guardrail: A single can of liquid hoof dressing won't be £100
+                        if extracted_val < 80.00: 
+                            return {
+                                "Retailer": store_name,
+                                "Price": extracted_val,
+                                "Link": store_info["url"]
+                            }
         return {"Retailer": store_name, "Price": None, "Link": store_info["url"]}
     except Exception:
         return {"Retailer": store_name, "Price": None, "Link": store_info["url"]}
@@ -166,14 +174,13 @@ if st.button("⚡ Scan Live Hoof Dressing Prices", type="primary"):
                     label=f"Cheapest at {best_deal['Retailer']}", 
                     value=f"£{best_deal['Price']:.2f}"
                 )
-                # Raw fallback link generation for the absolute winner card
                 st.markdown(f"[Go Directly to {best_deal['Retailer']} ↗️]({best_deal['Link']})")
                 
             with col2:
                 st.markdown("### All Available Live Prices")
                 success_df["Price Display"] = success_df["Price"].apply(lambda p: f"£{p:.2f}")
                 
-                # FIX: We keep the link raw here, and let st.column_config.LinkColumn turn it into a beautiful, clickable UI link safely!
+                # Render using Streamlit's native and safe Link Column formatting
                 st.dataframe(
                     success_df[["Retailer", "Price Display", "Link"]],
                     column_config={
