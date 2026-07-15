@@ -16,7 +16,6 @@ st.set_page_config(
 st.title("Kevin Bacon Tracker")
 st.markdown(
     """
-    Compare real-time prices. 
     All requests are securely routed through **Scrape.do** proxies with container-specific selectors to prevent sidebar price leakage.
     """
 )
