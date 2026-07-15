@@ -1,6 +1,6 @@
 # 🐴 Kevin Bacon Hoof Dressing Tracker
 
-A real-time web-scraping dashboard built with Python and Streamlit. It fetches, parses, and compares prices for *Kevin Bacon's Liquid Hoof Dressing* from 9 major UK equestrian retailers simultaneously using multi-threading.
+A real-time web-scraping dashboard built with Python and Streamlit. It fetches, parses, and compares prices for *Kevin Bacon's Liquid Hoof Dressing* from major UK equestrian retailers simultaneously using multi-threading.
 
 ## How to Run Locally
 1. Clone the repository
