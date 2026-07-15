@@ -257,7 +257,7 @@ display_df = st.session_state["scrapedo_matrix"].copy()
 display_df["500ml Can"] = display_df["Price (500ml)"].apply(lambda x: f"£{x:.2f}" if pd.notna(x) and x is not None else "N/A")
 display_df["1 Litre Can"] = display_df["Price (1L)"].apply(lambda x: f"£{x:.2f}" if pd.notna(x) and x is not None else "N/A")
 
-st.subheader("📋 Live Price Comparison Board (500ml vs 1L)")
+st.subheader("Price Comparison Board")
 st.dataframe(
     display_df[["Retailer", "500ml Can", "1 Litre Can", "Link", "Status"]],
     column_config={
