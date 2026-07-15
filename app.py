@@ -32,7 +32,7 @@ except KeyError:
 STORE_DATABASE = {
     "Waterman's Supplies": {
         "url": "https://www.watermanscountrysupplies.co.uk/hoof-care/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": "span.price, .product-actions-wrapper .price",
+        "price_selector": ".product-actions-wrapper .price, .product-info-main .price",
         "fallback_500ml": 12.79, "fallback_1l": None,
         "is_shopify": False
     },
@@ -60,7 +60,7 @@ STORE_DATABASE = {
     },
     "Redpost Equestrian": {
         "url": "https://www.redpostequestrian.co.uk/horse-care/hoof-care/kevin-bacon-liquid-hoof-dressing__149552",
-        "price_selector": ".product-info-main .price, .product-info-price .price",
+        "price_selector": ".product-info-price .price, .price-box .price",
         "fallback_500ml": 18.60, "fallback_1l": 29.00,
         "is_shopify": False
     },
@@ -94,7 +94,7 @@ STORE_DATABASE = {
     },
     "Mole Avon": {
         "url": "https://www.moleavon.co.uk/kevin-bacons-liquid-hoof-dressing-500ml/p21647",
-        "price_selector": "div.product-form__price-wrapper span.product-form__price",
+        "price_selector": "span.product-form__price",
         "fallback_500ml": 21.00, "fallback_1l": None,
         "is_shopify": False
     },
@@ -108,7 +108,7 @@ STORE_DATABASE = {
 def clean_extracted_price(text_string):
     if not text_string:
         return None
-    clean_str = text_string.replace('\n', '').replace('\r', '').strip()
+    clean_str = text_string.replace('\n', '').replace('\r', '').replace(' ', '').strip()
     match = re.search(r'£?\s*(\d+(?:\.\d{2})?)', clean_str)
     if match:
         val = float(match.group(1))
@@ -119,7 +119,8 @@ def clean_extracted_price(text_string):
 def fetch_via_scrapedo(store_name, info, token):
     p_500 = None
     p_1l = None
-    status = "🟢 Live Scraped"
+    status = "⚠️ Connection Timeout"
+    scrape_success = False
 
     try:
         # A. Direct JSON Parser for Shopify Stores (AG, GS, Millbry, First Choice, Equi)
@@ -136,12 +137,15 @@ def fetch_via_scrapedo(store_name, info, token):
                     val = float(variant.get("price", 0)) / 100.00
                     if "500" in title:
                         p_500 = val
+                        scrape_success = True
                     elif any(x in title for x in ["1l", "1 l", "1ltr", "litre"]):
                         p_1l = val
+                        scrape_success = True
+                status = "🟢 Live Scraped"
             else:
                 status = f"❌ Error (API Code {res.status_code})"
 
-        # B. Structured HTML parsing for non-Shopify stores (Saves Credits - render=false)
+        # B. Structured HTML parsing for non-Shopify stores
         else:
             encoded_target = urllib.parse.quote(info["url"], safe="")
             api_url = f"https://api.scrape.do/?token={token}&url={encoded_target}&render=false"
@@ -152,17 +156,18 @@ def fetch_via_scrapedo(store_name, info, token):
                 body_text = soup.get_text().lower()
 
                 if store_name == "Mole Avon":
-                    # Restrict text search to the core product details block to avoid sidebar delivery options
-                    product_wrap = soup.select_one(".product-single__meta, .product-form__price-wrapper")
-                    scope_text = product_wrap.get_text().lower() if product_wrap else body_text
-                    
-                    match = re.search(r'£?(\d+\.\d{2})\s*inc\s*vat', scope_text, re.IGNORECASE)
+                    # Directly look for price strings combined with VAT declarations to guarantee correct targeting
+                    match = re.search(r'£?(\d+\.\d{2})\s*inc\s*vat', body_text, re.IGNORECASE)
                     if match:
                         p_500 = float(match.group(1))
+                        scrape_success = True
                     else:
                         price_node = soup.select_one(info["price_selector"])
                         if price_node:
                             p_500 = clean_extracted_price(price_node.get_text())
+                            if p_500:
+                                scrape_success = True
+                    status = "🟢 Live Scraped"
                 else:
                     found_prices = []
                     for element in soup.select(info["price_selector"]):
@@ -175,8 +180,11 @@ def fetch_via_scrapedo(store_name, info, token):
                         for price in found_prices:
                             if 11.00 <= price <= 20.00:
                                 p_500 = price
+                                scrape_success = True
                             elif 20.01 <= price <= 32.00:
                                 p_1l = price
+                                scrape_success = True
+                        status = "🟢 Live Scraped"
             else:
                 status = f"❌ Error (API Code {res.status_code})"
 
@@ -189,16 +197,13 @@ def fetch_via_scrapedo(store_name, info, token):
     if info["fallback_1l"] is None:
         p_1l = None
 
-    # Fallback to verified baseline if the live scraper failed to find a valid price
-    if p_500 is None and info["fallback_500ml"] is not None:
-        p_500 = info["fallback_500ml"]
-        if "🟢" in status:
-            status = "🟡 Parsed fallback"
-            
-    if p_1l is None and info["fallback_1l"] is not None:
-        p_1l = info["fallback_1l"]
-        if "🟢" in status:
-            status = "🟡 Parsed fallback"
+    # Fallback to verified baseline ONLY if live retrieval failed entirely
+    if not scrape_success:
+        if p_500 is None and info["fallback_500ml"] is not None:
+            p_500 = info["fallback_500ml"]
+        if p_1l is None and info["fallback_1l"] is not None:
+            p_1l = info["fallback_1l"]
+        status = "🟡 Parsed fallback"
 
     return {
         "Retailer": store_name,
