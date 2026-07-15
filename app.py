@@ -94,7 +94,7 @@ STORE_DATABASE = {
     },
     "Mole Avon": {
         "url": "https://www.moleavon.co.uk/kevin-bacons-liquid-hoof-dressing-500ml/p21647",
-        "price_selector": "span.product-form__price",
+        "price_selector": "div.product-form__price-wrapper span.product-form__price",
         "fallback_500ml": 21.00, "fallback_1l": None,
         "is_shopify": False
     },
@@ -156,8 +156,17 @@ def fetch_via_scrapedo(store_name, info, token):
                 body_text = soup.get_text().lower()
 
                 if store_name == "Mole Avon":
-                    # Directly look for price strings combined with VAT declarations to guarantee correct targeting
-                    match = re.search(r'£?(\d+\.\d{2})\s*inc\s*vat', body_text, re.IGNORECASE)
+                    # Locate the product details container (which contains "Item:")
+                    # This prevents pulling global sidebar ads like "Fly Rug £30.99"
+                    product_container = None
+                    for element in soup.find_all(["div", "section", "article"]):
+                        el_text = element.get_text()
+                        if "item:" in el_text.lower() and "inc vat" in el_text.lower():
+                            if not product_container or len(el_text) < len(product_container.get_text()):
+                                product_container = element
+                    
+                    scope_text = product_container.get_text().lower() if product_container else body_text
+                    match = re.search(r'£?(\d+\.\d{2})\s*inc\s*vat', scope_text, re.IGNORECASE)
                     if match:
                         p_500 = float(match.group(1))
                         scrape_success = True
@@ -228,7 +237,7 @@ if st.button("🔄 Scrape Live Prices Now", type="primary"):
         df = pd.DataFrame(results)
         df["sort_val"] = df["Price (500ml)"].fillna(999.00)
         st.session_state["scrapedo_matrix"] = df.sort_values(by="sort_val").drop(columns=["sort_val"])
-        st.success("🎉 Live requests updated cleanly via Scrape.do!")
+        st.success("🎉 Live requests updated via Scrape.do!")
 
 # Default fallback layout on startup
 if "scrapedo_matrix" not in st.session_state:
