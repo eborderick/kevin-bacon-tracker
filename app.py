@@ -47,7 +47,8 @@ STORES_CLOUD_FRIENDLY = {
     },
     "Mole Avon": {
         "url": "https://www.moleavon.co.uk/kevin-bacons-liquid-hoof-dressing-500ml/p21647",
-        "selectors": [".price", "span.price", ".product-form__price"]
+        # Specific target to fetch the 'inc VAT' text block directly to avoid grabbing ex-VAT or raw IDs
+        "selectors": [".product-form__price"]
     },
     "Discount Equestrian": {
         "url": "https://www.discount-equestrian.co.uk/kevin-bacon-s-liquid-hoof-dressing.html",
@@ -118,6 +119,14 @@ def fetch_price(store_name, store_info):
                 price_element = soup.select_one(selector)
                 if price_element:
                     price_text = price_element.get_text(strip=True)
+                    
+                    # If dealing with Mole Avon, prioritize finding the true inc VAT tag specifically
+                    if store_name == "Mole Avon":
+                        inc_vat_match = re.search(r'£?(\d+\.\d{2})\s*inc\s*VAT', price_text, re.IGNORECASE)
+                        if inc_vat_match:
+                            return {"Retailer": store_name, "Price": float(inc_vat_match.group(1)), "Link": store_info["url"]}
+                    
+                    # Default regex extraction fallback
                     match = re.search(r'\d+(?:\.\d{2})?', price_text)
                     if match:
                         return {
@@ -157,19 +166,20 @@ if st.button("⚡ Scan Live Hoof Dressing Prices", type="primary"):
                     label=f"Cheapest at {best_deal['Retailer']}", 
                     value=f"£{best_deal['Price']:.2f}"
                 )
+                # Raw fallback link generation for the absolute winner card
                 st.markdown(f"[Go Directly to {best_deal['Retailer']} ↗️]({best_deal['Link']})")
                 
             with col2:
                 st.markdown("### All Available Live Prices")
                 success_df["Price Display"] = success_df["Price"].apply(lambda p: f"£{p:.2f}")
-                success_df["Shop Link"] = success_df["Link"].apply(lambda url: f"[View Product]({url})")
                 
+                # FIX: We keep the link raw here, and let st.column_config.LinkColumn turn it into a beautiful, clickable UI link safely!
                 st.dataframe(
-                    success_df[["Retailer", "Price Display", "Shop Link"]],
+                    success_df[["Retailer", "Price Display", "Link"]],
                     column_config={
                         "Retailer": "Store",
                         "Price Display": "Price",
-                        "Shop Link": st.column_config.LinkColumn("Purchase Link")
+                        "Link": st.column_config.LinkColumn("Purchase Link", display_text="View Product")
                     },
                     hide_index=True,
                     use_container_width=True
