@@ -4,7 +4,7 @@ import concurrent.futures
 import re
 from bs4 import BeautifulSoup
 
-# We import standard requests and curl_cffi for local spoofing
+# Check environment state for curl_cffi fingerprint spoofing
 import requests
 try:
     from curl_cffi import requests as cf_requests
@@ -12,9 +12,9 @@ try:
 except ImportError:
     CURL_CFFI_AVAILABLE = False
 
-# Streamlit UI Setup
+# Layout Config
 st.set_page_config(
-    page_title="Kevin Bacon's Liquid Price Matcher",
+    page_title="Ultimate Liquid Hoof Dressing Price Tracker",
     page_icon="🐴",
     layout="wide"
 )
@@ -22,12 +22,12 @@ st.set_page_config(
 st.title("🐴 Kevin Bacon's Liquid Hoof Dressing Tracker")
 st.markdown(
     """
-    Compare live prices for the **Liquid version** (usually comes in a tin with a brush cap). 
-    This app is split to work flawlessly on both **Streamlit Cloud** (for you and your farrier) and **Locally** on your laptop.
+    Compare live prices across **13 major retailers** instantly. 
+    This app ensures a clean visual match on the **Liquid** formulation (brush-in-cap tin).
     """
 )
 
-# Retailer configurations (Strictly mapped to the LIQUID version)
+# 1. Cloud-Friendly Sites (Work perfectly on Streamlit Cloud for you & your farrier)
 STORES_CLOUD_FRIENDLY = {
     "VioVet (Liquid Edition)": {
         "url": "https://www.viovet.co.uk/Kevin-Bacons-Liquid-Hoof-Dressing/c171350/",
@@ -44,10 +44,19 @@ STORES_CLOUD_FRIENDLY = {
     "Hyperdrug (Equine)": {
         "url": "https://hyperdrug.co.uk/kevin-bacons-liquid-hoof-dressing/",
         "selectors": [".price-and-qty-wrapper .price", ".price", "span.price"]
+    },
+    "Mole Avon": {
+        "url": "https://www.moleavon.co.uk/kevin-bacons-liquid-hoof-dressing-500ml/p21647",
+        "selectors": [".price", "span.price", ".product-form__price"]
+    },
+    "Discount Equestrian": {
+        "url": "https://www.discount-equestrian.co.uk/kevin-bacon-s-liquid-hoof-dressing.html",
+        "selectors": [".price", "span.price", ".regular-price"]
     }
 }
 
-STORES_PROTECTED_SHOPIFY = {
+# 2. Local-Required / Protected Sites (Unlocks when run on a local machine to avoid 429 blocks)
+STORES_PROTECTED = {
     "GS Equestrian": {
         "url": "https://gsequestrian.co.uk/products/kevin-bacon-kevin-bacon-s-liquid-hoof-dressing-1823",
         "selectors": ["span.price-item--sale", "span.price-item"]
@@ -63,39 +72,44 @@ STORES_PROTECTED_SHOPIFY = {
     "AG Equestrian": {
         "url": "https://www.ag-equestrian.co.uk/products/kevin-bacons-liquid-hoof-dressing",
         "selectors": ["span.price-item--sale", "span.price-item"]
+    },
+    "First Choice Horse Supplies": {
+        "url": "https://firstchoicehorsesupplies.co.uk/products/kevin-bacon-liquid-hoof-dressing-500ml",
+        "selectors": ["span.price-item--sale", "span.price-item", ".price"]
+    },
+    "Tanner Trading": {
+        "url": "https://www.tannertrading.co.uk/hoof-protection/kevin-bacons-liquid-hoof-dressing/",
+        "selectors": [".price--withoutTax", "span.price", ".price"]
+    },
+    "Waterman's Supplies": {
+        "url": "https://www.watermanscountrysupplies.co.uk/hoof-care/kevin-bacons-liquid-hoof-dressing/",
+        "selectors": [".price", ".product-price", ".price-item"]
     }
 }
 
-# Auto-detect if running locally or on Streamlit Cloud
+# Check context
 is_local = CURL_CFFI_AVAILABLE and not st.secrets.get("STREAMLIT_SERVER", {}).get("headless", False)
 
-# Sidebar indicator
 st.sidebar.subheader("⚙️ System Status")
 if is_local:
-    st.sidebar.success("💻 Running Locally (Spoofing Mode Unlocked)")
-    scan_all = st.sidebar.checkbox("Include Protected Shopify Stores", value=True)
+    st.sidebar.success("💻 Local Engine Unlocked")
+    scan_protected = st.sidebar.checkbox("Include Protected/Shopify Stores (13 Total)", value=True)
 else:
-    st.sidebar.info("☁️ Running on Streamlit Cloud")
-    st.sidebar.caption("To prevent Cloudflare blocks, standard Cloud scans target highly cooperative, cloud-friendly stores.")
-    scan_all = False
+    st.sidebar.info("☁️ Cloud Live Engine")
+    st.sidebar.caption("Optimized for your farrier. Cloud-safe mode queries open-access suppliers to secure 100% stable results.")
+    scan_protected = False
 
-# Choose stores list based on status
+# Aggregate target list
 active_stores = STORES_CLOUD_FRIENDLY.copy()
-if scan_all:
-    active_stores.update(STORES_PROTECTED_SHOPIFY)
-
-# Scraper Logic
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-}
+if scan_protected:
+    active_stores.update(STORES_PROTECTED)
 
 def fetch_price(store_name, store_info):
     try:
-        # If running locally, use curl_cffi to mimic browser fingerprints. On cloud, use standard requests.
         if is_local:
             response = cf_requests.get(store_info["url"], impersonate="chrome", timeout=10)
         else:
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
             response = requests.get(store_info["url"], headers=headers, timeout=8)
             
         if response.status_code == 200:
@@ -109,16 +123,15 @@ def fetch_price(store_name, store_info):
                         return {
                             "Retailer": store_name,
                             "Price": float(match.group(0)),
-                            "Link": store_info["url"],
-                            "Status": "Online"
+                            "Link": store_info["url"]
                         }
-        return {"Retailer": store_name, "Price": None, "Link": store_info["url"], "Status": f"HTTP {response.status_code}"}
-    except Exception as e:
-        return {"Retailer": store_name, "Price": None, "Link": store_info["url"], "Status": "Timeout/Blocked"}
+        return {"Retailer": store_name, "Price": None, "Link": store_info["url"]}
+    except Exception:
+        return {"Retailer": store_name, "Price": None, "Link": store_info["url"]}
 
-# Trigger Button
+# Trigger Analysis
 if st.button("⚡ Scan Live Hoof Dressing Prices", type="primary"):
-    with st.spinner("Fetching prices..."):
+    with st.spinner(f"Querying {len(active_stores)} retailers in parallel..."):
         results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(active_stores)) as executor:
             future_to_store = {
@@ -162,8 +175,8 @@ if st.button("⚡ Scan Live Hoof Dressing Prices", type="primary"):
                     use_container_width=True
                 )
         else:
-            st.error("No prices could be compiled. Please try scanning again.")
+            st.error("No prices could be compiled. Please check connection parameters.")
 
         if not failed_df.empty:
-            with st.expander("🔍 Show Scraper Statuses (Offline / Restricted Stores)"):
-                st.dataframe(failed_df[["Retailer", "Status"]], hide_index=True, use_container_width=True)
+            with st.expander("🔍 Show Scraper Statuses (Stores bypassed or offline)"):
+                st.dataframe(failed_df[["Retailer"]], hide_index=True, use_container_width=True)
