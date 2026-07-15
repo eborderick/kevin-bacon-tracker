@@ -32,7 +32,7 @@ except KeyError:
 STORE_DATABASE = {
     "Waterman's Supplies": {
         "url": "https://www.watermanscountrysupplies.co.uk/hoof-care/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": ".product-actions-wrapper .price, .product-info-main .price",
+        "price_selector": "span.price, .product-actions-wrapper .price",
         "fallback_500ml": 12.79, "fallback_1l": None,
         "is_shopify": False
     },
@@ -48,19 +48,19 @@ STORE_DATABASE = {
     },
     "Tanner Trading": {
         "url": "https://www.tannertrading.co.uk/hoof-protection/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": ".productView-info .price--withoutTax, .productView-options .price--withoutTax",
+        "price_selector": ".productView-price .price--withoutTax, .productView-options .price--withoutTax",
         "fallback_500ml": 15.98, "fallback_1l": 24.34,
         "is_shopify": False
     },
     "Hyperdrug (Equine)": {
         "url": "https://hyperdrug.co.uk/kevin-bacons-liquid-hoof-dressing/",
-        "price_selector": ".product-view .price-and-qty-wrapper .price, .product-view .price",
+        "price_selector": ".product-info-main .price, .product-view .price",
         "fallback_500ml": 18.60, "fallback_1l": 29.00,
         "is_shopify": False
     },
     "Redpost Equestrian": {
         "url": "https://www.redpostequestrian.co.uk/horse-care/hoof-care/kevin-bacon-liquid-hoof-dressing__149552",
-        "price_selector": ".product-info-price .price, .price-box .price",
+        "price_selector": ".product-info-main .price, .product-info-price .price",
         "fallback_500ml": 18.60, "fallback_1l": 29.00,
         "is_shopify": False
     },
@@ -94,7 +94,7 @@ STORE_DATABASE = {
     },
     "Mole Avon": {
         "url": "https://www.moleavon.co.uk/kevin-bacons-liquid-hoof-dressing-500ml/p21647",
-        "price_selector": ".product-form__price-wrapper .product-form__price",
+        "price_selector": "div.product-form__price-wrapper span.product-form__price",
         "fallback_500ml": 21.00, "fallback_1l": None,
         "is_shopify": False
     },
